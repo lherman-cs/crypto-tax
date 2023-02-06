@@ -1,19 +1,11 @@
 from typing import Iterator
 
 TURBOTAX_HEADERS = [
-    "Date",
-    "Type",
-    "Sent Asset",
-    "Sent Amount",
-    "Received Asset",
-    "Received Amount",
-    "Fee Asset",
-    "Fee Amount",
-    "Market Value Currency",
-    "Market Value",
-    "Description",
-    "Transaction Hash",
-    "Transaction ID",
+        "Currency Name",
+        "Purchase Date",
+        "Cost Basis",
+        "Date Sold",
+        "Proceeds"
 ]
 
 def read_line(line: str):
@@ -54,47 +46,35 @@ def generate_mapper(headers: Iterator[str], transform_fn):
 
 def cryptocom_transformer(col_index: int, value: str, is_header: bool) -> str:
     headers = [
-        "Date",
-        "Source",
-        "Wallet/Exchange",
-        "Wallet/Exchange (User Defined Name)",
-        "Type",
-        "Received Amount",
-        "Received Currency",
-        "Received Wallet",
-        "Received Address",
-        "Received Tag",
-        "Sent Amount",
-        "Sent Currency",
-        "Sent Wallet",
-        "Sent Address",
-        "Sent Tag",
-        "Fee Amount",
-        "Fee Currency",
-        "ST Capital Gain/Loss",
-        "ST Capital Gain/Loss",
-        "Comment"
+            "Asset Amount",
+            "Asset Name",
+            "Date of Sale",
+            "Date of Acquisition",
+            "Net Proceeds (USD)",
+            "Cost Basis (USD)",
+            "ST Capital Gain/Loss (USD)",
+            "LT Capital Gain/Loss (USD)"
     ]
     if is_header:
-        aliases = {
-            "Sent Currency": "Sent Asset",
-            "Received Currency": "Received Currency",
-            "Fee Currency": "Fee Currency",
-            "Comment": "Description",
-        }
-        return aliases.get(value, value)
+        if "Asset Name" in value:
+            return "Currency Name"
+        elif "Date of Acquisition" in value:
+            return "Purchase Date"
+        elif "Cost Basis (USD)" in value:
+            return "Cost Basis"
+        elif "Date of Sale" in value:
+            return "Date Sold"
+        elif "Net Proceeds (USD)" in value:
+            return "Proceeds"
+        else:
+            return value
 
-    header = headers[col_index]
-    if header == "Type":
-        type_map = {
-            "Receive": "Staking",
-            "Buy": "Buy",
-            "Sell": "Sale",
-            "Trade": "Convert",
-            "Cost": "Expense",
-            "Transfer": "Transfer",
-            # TODO: Convert "Send" to either "Withdrawal" or "Deposit"
-        }
+    # if headers[col_index] in ["Cost Basis (USD)", "Net Proceeds (USD)"]:
+    #     parsed = value.replace('"', '')
+    #     parsed = ''.join(parsed.split(','))
+    #     parsed = float(parsed)
+    #     value = f'{parsed:.2f}'
+
     return value
 
 
@@ -102,21 +82,27 @@ def transform_csv(file_path: str, transform_fn):
     is_header = True
     mapper = []
     for row in read_csv(file_path):
+        transformed_cols = [''] * len(TURBOTAX_HEADERS)
         if is_header:
             row = list(row)
             mapper = generate_mapper(row, transform_fn)
-            is_header = False
+            transformed_cols = TURBOTAX_HEADERS.copy()
 
-        transformed_cols = [''] * len(TURBOTAX_HEADERS)
         for i, col in enumerate(row):
             mapped_index = mapper[i]
             if mapped_index == -1:
                 continue
 
             # transform_fn on header has been used
-            transformed_cols[mapped_index] = transform_fn(i, col, False)
+            transformed_cols[mapped_index] = transform_fn(i, col, is_header)
+
+        if is_header:
+            is_header = False
         yield transformed_cols
 
 
-for cols in transform_csv('cryptocom.csv', cryptocom_transformer):
-    print(cols)
+with open('out.csv', 'w') as out:
+    for cols in transform_csv('cryptocom.csv', cryptocom_transformer):
+        print(','.join(cols), file=out, flush=True)
+
+
