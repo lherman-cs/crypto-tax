@@ -10,7 +10,7 @@ addresses='{"addresses":[{"balance":"0","hash":"013a3dbe375d1db71716352e5f8fd821
 #   -X GET "https://api.cardanoscan.io/api/v1/rewardAccount/addresses?rewardAddress=${ADDRESS}&pageNo=1&limit=50" \
 #   -H "apiKey: $API_KEY"
 
-addresses=`echo $addresses | jq -r '.addresses[] | .hash'`
+addresses=`echo $addresses | yq -r '.addresses[] | .hash'`
 
 for addr in ${addresses[*]}
 do
@@ -19,7 +19,7 @@ do
   # curl \
   #   -X GET "https://api.cardanoscan.io/api/v1/transaction/list?address=${addr}&pageNo=1&limit=50" \
   #   -H "apiKey: $API_KEY"
-  echo "$transactions" | jq '.transactions[]'
+  echo "$transactions" | yq '.transactions[] | {hash: .hash, block: .blockHash}'
   exit 0
 done
 
