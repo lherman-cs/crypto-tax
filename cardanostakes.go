@@ -69,10 +69,6 @@ const (
 	TokenTypeNums
 )
 
-// https://pkg.go.dev/time#pkg-constants
-// Date and Time will be merged from raw
-const DateTimeFormat = "02 Jan 06 15:04:05"
-
 type Transaction struct {
 	DateTime time.Time
 	Err      error
@@ -126,7 +122,7 @@ func OutputToCryptoTaxTracker(writer io.Writer, transactionList []Transaction) {
 func OutputToTurboTaxUniversal(writer io.Writer, transactionList []Transaction, header bool) {
 	// https://pkg.go.dev/time#pkg-constants
 	dateFormat := "01/02/2006"
-  floatingPointFormat := "%.8f" // TurboTax only allows up to 8 decimal points
+	floatingPointFormat := "%.8f" // TurboTax only allows up to 8 decimal points
 
 	tokenToString := func(token TurboTaxCSVToken) string {
 		switch token {
@@ -201,8 +197,12 @@ func OutputToTurboTaxUniversal(writer io.Writer, transactionList []Transaction, 
 	}
 }
 
-func main() {
-	scanner := bufio.NewScanner(os.Stdin)
+func InputCryptoTaxTracker(reader io.Reader) []Transaction {
+	// https://pkg.go.dev/time#pkg-constants
+	// Date and Time will be merged from raw
+  dateFormat := "02 Jan 06 15:04:05"
+
+	scanner := bufio.NewScanner(reader)
 	tokenIdx := TokenTypeStakeLogo
 	txIdx := 0
 	dateRaw := ""
@@ -217,7 +217,7 @@ func main() {
 			dateRaw = line
 		case TokenTypeTime:
 			dateTimeRaw := fmt.Sprintf("%s %s", dateRaw, line)
-			dateTime, err := time.Parse(DateTimeFormat, dateTimeRaw)
+			dateTime, err := time.Parse(dateFormat, dateTimeRaw)
 			transaction.DateTime = dateTime
 			transaction.Err = errors.Join(transaction.Err, err)
 		case TokenTypeIncomingAmount:
@@ -251,5 +251,10 @@ func main() {
 		}
 	}
 
+	return transactionList
+}
+
+func main() {
+	transactionList := InputCryptoTaxTracker(os.Stdin)
 	OutputToTurboTaxUniversal(os.Stdout, transactionList, true)
 }
