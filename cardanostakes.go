@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -13,6 +14,21 @@ import (
 // use cardano full node wallet, then query the address
 //
 // https://iohk.zendesk.com/hc/en-us/articles/900004340586-How-to-symlink-Daedalus-chain-folder
+type CryptoTaxTrackerCSVTokenType int
+
+// TODO: convert this to TurboTax universal template
+// https://ttlc.intuit.com/turbotax-support/en-us/help-article/cryptocurrency/create-csv-file-unsupported-source/L1yhp71Nt_US_en_US
+// Currency Name,Purchase Date,Date Sold,Proceeds,Cost Basis
+const (
+	CryptoTaxTrackerCSVTokenTypeCurrencyName CryptoTaxTrackerCSVTokenType = iota
+	CryptoTaxTrackerCSVTokenTypePurchaseDate
+	CryptoTaxTrackerCSVTokenTypeDateSold
+	CryptoTaxTrackerCSVTokenTypeProceeds
+	CryptoTaxTrackerCSVTokenTypeCostBasis
+	CryptoTaxTrackerCSVTokenTypeNums
+)
+
+const CryptoTaxTrackerCSVDateTimeFormat = "01/02/2006"
 
 type TokenType int
 
@@ -75,10 +91,10 @@ func main() {
 		tokenIdx = (tokenIdx + 1) % TokenTypeNums
 		if tokenIdx == 0 {
 			if transaction.Err == nil {
-				fmt.Printf(">>> Transaction #%d: %f (%v)\n", txIdx, transaction.ValueUSD, transaction.DateTime)
+				fmt.Fprintf(os.Stderr, ">>> Transaction #%d: %f (%v)\n", txIdx, transaction.ValueUSD, transaction.DateTime)
 				transactionList = append(transactionList, transaction)
 			} else {
-				fmt.Printf(">>> Transaction #%d failed: %v\n", txIdx, transaction.Err)
+				fmt.Fprintf(os.Stderr, ">>> Transaction #%d failed: %v\n", txIdx, transaction.Err)
 			}
 			transaction.Err = nil
 			txIdx++
@@ -86,5 +102,26 @@ func main() {
 	}
 
 	// process transaction list to CryptoTaxTracker Format
-	fmt.Println(transactionList)
+	for _, transaction := range transactionList {
+		var values [CryptoTaxTrackerCSVTokenTypeNums]string
+		for tokenType := CryptoTaxTrackerCSVTokenTypeCurrencyName; tokenType < CryptoTaxTrackerCSVTokenTypeNums; tokenType++ {
+			switch tokenType {
+			case CryptoTaxTrackerCSVTokenTypeCurrencyName:
+				// HACK: should parse this from transaction
+				values[tokenType] = "ADA"
+			case CryptoTaxTrackerCSVTokenTypePurchaseDate:
+				values[tokenType] = transaction.DateTime.Format(CryptoTaxTrackerCSVDateTimeFormat)
+			case CryptoTaxTrackerCSVTokenTypeDateSold:
+				// TODO: Should this be empty when we're dealing with stake rewards?
+				values[tokenType] = ""
+				values[tokenType] = transaction.DateTime.Format(CryptoTaxTrackerCSVDateTimeFormat)
+			case CryptoTaxTrackerCSVTokenTypeProceeds:
+				values[tokenType] = fmt.Sprintf("%f", transaction.ValueUSD)
+			case CryptoTaxTrackerCSVTokenTypeCostBasis:
+				values[tokenType] = "0"
+			}
+		}
+
+		fmt.Fprintln(os.Stdout, strings.Join(values[:], ","))
+	}
 }
